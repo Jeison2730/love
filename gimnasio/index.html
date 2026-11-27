@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gestión del Gimnasio</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --text: #1d2330; --muted: #6b7280;
+    --border: #e2e5ea; --accent: #2563eb; --accent-text: #ffffff;
+    --ok: #15803d; --ok-bg: #dcfce7; --warn: #a16207; --warn-bg: #fef3c7;
+    --bad: #b91c1c; --bad-bg: #fee2e2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --card: #1b2029; --text: #e6e8ec; --muted: #9aa3b2;
+      --border: #2c3340; --accent: #3b82f6; --accent-text: #ffffff;
+      --ok: #4ade80; --ok-bg: #12301f; --warn: #facc15; --warn-bg: #3a2f0b;
+      --bad: #f87171; --bad-bg: #3b1515;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { background: var(--card); border-bottom: 1px solid var(--border);
+    padding: 12px 16px; position: sticky; top: 0; z-index: 5; }
+  header h1 { margin: 0 0 8px; font-size: 19px; }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; }
+  nav button { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  nav button.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  main { max-width: 1000px; margin: 0 auto; padding: 16px; }
+  section { display: none; } section.active { display: block; }
+  button, .btn { font: inherit; padding: 7px 12px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text); text-decoration: none; display: inline-block; }
+  button.ghost { background: transparent; color: var(--text); border-color: var(--border); }
+  button.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+  button.small { padding: 4px 8px; font-size: 13px; }
+  input, select, textarea { font: inherit; padding: 8px 10px; border-radius: 8px; width: 100%;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  label > input, label > select, label > textarea { margin-top: 3px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+  .stat .n { font-size: 26px; font-weight: 700; }
+  .stat .l { color: var(--muted); font-size: 13px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .toolbar input, .toolbar select { width: auto; flex: 1 1 160px; }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .item { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .item .info { flex: 1 1 220px; min-width: 0; }
+  .item .name { font-weight: 600; }
+  .item .sub { color: var(--muted); font-size: 13px; }
+  .item .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+  .b-ok { background: var(--ok-bg); color: var(--ok); }
+  .b-warn { background: var(--warn-bg); color: var(--warn); }
+  .b-bad { background: var(--bad-bg); color: var(--bad); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+  .empty { color: var(--muted); text-align: center; padding: 20px; }
+  dialog { border: 1px solid var(--border); border-radius: 14px; background: var(--card); color: var(--text);
+    width: min(560px, calc(100vw - 32px)); padding: 18px; }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  dialog h2 { margin-top: 0; font-size: 18px; }
+  .row-end { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  h3 { margin: 4px 0 10px; font-size: 16px; }
+  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
+    padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏋️ Gestión del Gimnasio</h1>
+  <nav>
+    <button data-tab="panel" class="active">Panel</button>
+    <button data-tab="clientes">Clientes</button>
+    <button data-tab="asistencia">Asistencia</button>
+    <button data-tab="pagos">Pagos</button>
+    <button data-tab="ajustes">Planes y datos</button>
+  </nav>
+</header>
+
+<main>
+  <!-- PANEL -->
+  <section id="panel" class="active">
+    <div class="stats" id="stats"></div>
+    <div class="card">
+      <h3>⚠️ Vencen en los próximos 7 días</h3>
+      <div class="list" id="porVencer"></div>
+    </div>
+    <div class="card">
+      <h3>⛔ Membresías vencidas</h3>
+      <div class="list" id="vencidos"></div>
+    </div>
+  </section>
+
+  <!-- CLIENTES -->
+  <section id="clientes">
+    <div class="toolbar">
+      <input id="buscar" placeholder="Buscar por nombre, teléfono o email…">
+      <select id="filtroEstado">
+        <option value="">Todos</option>
+        <option value="activo">Activos</option>
+        <option value="porvencer">Por vencer</option>
+        <option value="vencido">Vencidos</option>
+      </select>
+      <button id="btnNuevo">+ Nuevo cliente</button>
+    </div>
+    <div class="list" id="listaClientes"></div>
+  </section>
+
+  <!-- ASISTENCIA -->
+  <section id="asistencia">
+    <div class="card">
+      <h3>Registrar entrada</h3>
+      <div class="toolbar">
+        <input id="buscarCheckin" placeholder="Escribe el nombre o teléfono del cliente…">
+      </div>
+      <div class="list" id="resultadosCheckin"></div>
+    </div>
+    <div class="card">
+      <h3>Entradas de hoy (<span id="cuentaHoy">0</span>)</h3>
+      <div id="tablaHoy"></div>
+    </div>
+  </section>
+
+  <!-- PAGOS -->
+  <section id="pagos">
+    <div class="toolbar">
+      <input type="month" id="mesPagos">
+      <button class="ghost" id="btnCsvPagos">Exportar pagos (CSV)</button>
+    </div>
+    <div class="stats" id="statsPagos"></div>
+    <div class="card"><div id="tablaPagos"></div></div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section id="ajustes">
+    <div class="card">
+      <h3>Planes de membresía</h3>
+      <div id="tablaPlanes"></div>
+      <form id="formPlan" class="grid2" style="margin-top:12px">
+        <label>Nombre del plan<input name="nombre" required placeholder="Ej: Mensual"></label>
+        <label>Duración (días)<input name="dias" type="number" min="1" required value="30"></label>
+        <label>Precio<input name="precio" type="number" min="0" step="0.01" required value="0"></label>
+        <label>&nbsp;<button type="submit">Agregar plan</button></label>
+      </form>
+    </div>
+    <div class="card">
+      <h3>Datos del gimnasio</h3>
+      <label>Nombre del gimnasio (aparece en los recordatorios)<input id="nombreGym" placeholder="Mi Gimnasio"></label>
+      <label>Símbolo de moneda<input id="moneda" placeholder="$" style="max-width:100px"></label>
+    </div>
+    <div class="card">
+      <h3>Copia de seguridad</h3>
+      <p class="sub" style="color:var(--muted);margin-top:0">Los datos se guardan solo en este navegador. Descarga una copia con regularidad.</p>
+      <div class="toolbar">
+        <button id="btnExportar">Descargar copia (JSON)</button>
+        <button class="ghost" id="btnCsvClientes">Exportar clientes (CSV)</button>
+        <label class="btn ghost" style="margin:0;color:var(--text);background:transparent;border-color:var(--border)">
+          Restaurar copia<input type="file" id="archivoImportar" accept=".json" hidden>
+        </label>
+        <button class="danger" id="btnBorrarTodo">Borrar todos los datos</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- DIÁLOGO CLIENTE -->
+<dialog id="dlgCliente">
+  <form id="formCliente" method="dialog">
+    <h2 id="tituloCliente">Nuevo cliente</h2>
+    <input type="hidden" name="id">
+    <div class="grid2">
+      <label>Nombre completo *<input name="nombre" required></label>
+      <label>Teléfono<input name="telefono" type="tel" placeholder="Ej: 8095551234"></label>
+      <label>Email<input name="email" type="email"></label>
+      <label>Documento / Cédula<input name="documento"></label>
+      <label>Fecha de nacimiento<input name="nacimiento" type="date"></label>
+      <label>Contacto de emergencia<input name="emergencia"></label>
+    </div>
+    <div id="bloqueAlta" class="grid2">
+      <label>Plan inicial<select name="plan"></select></label>
+      <label>Fecha de inicio<input name="inicio" type="date"></label>
+      <label><input type="checkbox" name="pagado" checked style="width:auto"> Registrar el pago del plan</label>
+    </div>
+    <label>Notas (lesiones, objetivos…)<textarea name="notas" rows="2"></textarea></label>
+    <div class="row-end">
+      <button type="button" class="ghost" data-close>Cancelar</button>
+      <button type="submit">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- DIÁLOGO RENOVAR -->
+<dialog id="dlgRenovar">
+  <form id="formRenovar" method="dialog">
+    <h2>Registrar pago / renovar</h2>
+    <p id="renovarCliente" style="margin-top:0"></p>
+    <input type="hidden" name="id">
+    <div class="grid2">
+      <label>Plan<select name="plan"></select></label>
+      <label>Monto<input name="monto" type="number" min="0" step="0.01"></label>
+      <label>Método de pago
+        <select name="metodo"><option>Efectivo</option><option>Tarjeta</option><option>Transferencia</option><option>Otro</option></select>
+      </label>
+      <label>Fecha del pago<input name="fecha" type="date"></label>
+    </div>
+    <p class="sub" id="renovarNuevoVence" style="color:var(--muted)"></p>
+    <div class="row-end">
+      <button type="button" class="ghost" data-close>Cancelar</button>
+      <button type="submit">Registrar pago</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- DIÁLOGO DETALLE -->
+<dialog id="dlgDetalle">
+  <div id="detalleContenido"></div>
+  <div class="row-end"><button type="button" class="ghost" data-close>Cerrar</button></div>
+</dialog>
+
+<div id="toast"></div>
+
+<script>
+(() => {
+  const KEY = 'gimnasio-datos-v1';
+  const DIA = 86400000;
+
+  // ---------- Datos ----------
+  const porDefecto = () => ({
+    gym: { nombre: 'Mi Gimnasio', moneda: '$' },
+    planes: [
+      { id: uid(), nombre: 'Diario', dias: 1, precio: 100 },
+      { id: uid(), nombre: 'Mensual', dias: 30, precio: 1500 },
+      { id: uid(), nombre: 'Trimestral', dias: 90, precio: 4000 },
+      { id: uid(), nombre: 'Anual', dias: 365, precio: 15000 },
+    ],
+    clientes: [], pagos: [], asistencias: [],
+  });
+
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  let db;
+  try { db = JSON.parse(localStorage.getItem(KEY)) || porDefecto(); } catch { db = porDefecto(); }
+  function guardar() {
+    try { localStorage.setItem(KEY, JSON.stringify(db)); }
+    catch { aviso('No se pudo guardar en este navegador. Descarga una copia.'); }
+  }
+
+  // ---------- Utilidades ----------
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const hoyISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+  const aFecha = iso => new Date(iso + 'T00:00:00');
+  const sumarDias = (iso, n) => { const d = aFecha(iso); d.setDate(d.getDate() + n); return fmtISO(d); };
+  const fmtISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const fmt = iso => iso ? aFecha(iso).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+  const dinero = n => db.gym.moneda + ' ' + Number(n || 0).toLocaleString('es', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const diasRestantes = c => c.vence ? Math.round((aFecha(c.vence) - aFecha(hoyISO())) / DIA) : -Infinity;
+  const plan = id => db.planes.find(p => p.id === id);
+
+  function estado(c) {
+    const d = diasRestantes(c);
+    if (d < 0) return { k: 'vencido', txt: c.vence ? `Vencido hace ${-d} d` : 'Sin membresía', cls: 'b-bad' };
+    if (d <= 7) return { k: 'porvencer', txt: d === 0 ? 'Vence hoy' : `Vence en ${d} d`, cls: 'b-warn' };
+    return { k: 'activo', txt: `Activo · ${d} d`, cls: 'b-ok' };
+  }
+
+  function aviso(msg) {
+    const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(aviso.t); aviso.t = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  function telWa(tel) {
+    let n = String(tel || '').replace(/\D/g, '');
+    if (n.length === 10) n = '1' + n; // RD / EE.UU. sin código de país
+    return n;
+  }
+  function linkRecordatorio(c) {
+    if (!c.telefono) return '';
+    const e = estado(c);
+    const msg = e.k === 'vencido'
+      ? `Hola ${c.nombre.split(' ')[0]}, te saludamos de ${db.gym.nombre}. Tu membresía venció el ${fmt(c.vence)}. ¡Te esperamos para renovarla! 💪`
+      : `Hola ${c.nombre.split(' ')[0]}, te saludamos de ${db.gym.nombre}. Tu membresía vence el ${fmt(c.vence)}. ¡No olvides renovarla! 💪`;
+    return `https://wa.me/${telWa(c.telefono)}?text=${encodeURIComponent(msg)}`;
+  }
+
+  // ---------- Lógica de negocio ----------
+  function registrarPago(clienteId, planId, monto, metodo, fecha) {
+    const c = db.clientes.find(x => x.id === clienteId); const p = plan(planId);
+    if (!c || !p) return;
+    // Si sigue activo, se extiende desde el vencimiento actual; si no, desde la fecha del pago.
+    const base = c.vence && c.vence >= fecha ? sumarDias(c.vence, 1) : fecha;
+    const desde = base;
+    const hasta = sumarDias(desde, p.dias - 1);
+    c.vence = hasta; c.planId = p.id;
+    db.pagos.push({ id: uid(), clienteId, planId, plan: p.nombre, monto: Number(monto) || 0, metodo, fecha, desde, hasta });
+    guardar();
+    return hasta;
+  }
+
+  function checkin(clienteId) {
+    const hoy = hoyISO();
+    if (db.asistencias.some(a => a.clienteId === clienteId && a.fecha === hoy)) { aviso('Ya registró su entrada hoy'); return; }
+    const hora = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+    db.asistencias.push({ id: uid(), clienteId, fecha: hoy, hora });
+    guardar();
+    const c = db.clientes.find(x => x.id === clienteId);
+    const e = estado(c);
+    aviso(e.k === 'vencido' ? `⚠️ ${c.nombre}: membresía vencida` : `✅ Entrada registrada: ${c.nombre}`);
+    render();
+  }
+
+  // ---------- Renderizado ----------
+  function itemCliente(c, { conCheckin = false } = {}) {
+    const e = estado(c); const p = plan(c.planId);
+    const wa = linkRecordatorio(c);
+    return `<div class="item">
+      <div class="info">
+        <div class="name">${esc(c.nombre)} <span class="badge ${e.cls}">${e.txt}</span></div>
+        <div class="sub">${esc(p ? p.nombre : 'Sin plan')} · vence ${fmt(c.vence)}${c.telefono ? ' · ' + esc(c.telefono) : ''}</div>
+      </div>
+      <div class="actions">
+        ${conCheckin ? `<button class="small" data-act="checkin" data-id="${c.id}">Registrar entrada</button>` : ''}
+        <button class="small" data-act="renovar" data-id="${c.id}">Cobrar / renovar</button>
+        ${!conCheckin ? `<button class="small ghost" data-act="ver" data-id="${c.id}">Ver</button>
+        <button class="small ghost" data-act="editar" data-id="${c.id}">Editar</button>` : ''}
+        ${wa && e.k !== 'activo' && !conCheckin ? `<a class="btn small ghost" style="color:var(--text);background:transparent;border-color:var(--border);padding:4px 8px;font-size:13px" target="_blank" rel="noopener" href="${wa}">WhatsApp</a>` : ''}
+      </div>
+    </div>`;
+  }
+
+  function lista(el, arr, vacio, opts) {
+    el.innerHTML = arr.length ? arr.map(c => itemCliente(c, opts)).join('') : `<div class="empty">${vacio}</div>`;
+  }
+
+  function renderPanel() {
+    const cs = db.clientes;
+    const est = cs.map(estado);
+    const mes = hoyISO().slice(0, 7);
+    const ingresosMes = db.pagos.filter(p => p.fecha.startsWith(mes)).reduce((s, p) => s + p.monto, 0);
+    const hoy = db.asistencias.filter(a => a.fecha === hoyISO()).length;
+    $('#stats').innerHTML = [
+      ['Clientes', cs.length],
+      ['Activos', est.filter(e => e.k !== 'vencido').length],
+      ['Por vencer (7 d)', est.filter(e => e.k === 'porvencer').length],
+      ['Vencidos', est.filter(e => e.k === 'vencido').length],
+      ['Entradas hoy', hoy],
+      ['Ingresos del mes', dinero(ingresosMes)],
+    ].map(([l, n]) => `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+    const orden = (a, b) => diasRestantes(a) - diasRestantes(b);
+    lista($('#porVencer'), cs.filter(c => estado(c).k === 'porvencer').sort(orden), 'Nadie vence esta semana 🎉');
+    lista($('#vencidos'), cs.filter(c => estado(c).k === 'vencido').sort((a, b) => orden(b, a)), 'No hay membresías vencidas');
+  }
+
+  function coincide(c, q) {
+    q = q.trim().toLowerCase(); if (!q) return true;
+    return [c.nombre, c.telefono, c.email, c.documento].some(v => String(v || '').toLowerCase().includes(q));
+  }
+
+  function renderClientes() {
+    const q = $('#buscar').value, f = $('#filtroEstado').value;
+    const arr = db.clientes.filter(c => coincide(c, q) && (!f || estado(c).k === f))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    lista($('#listaClientes'), arr, db.clientes.length ? 'Sin resultados' : 'Aún no hay clientes. Pulsa “+ Nuevo cliente”.');
+  }
+
+  function renderAsistencia() {
+    const q = $('#buscarCheckin').value;
+    const arr = q.trim() ? db.clientes.filter(c => coincide(c, q)).slice(0, 8) : [];
+    lista($('#resultadosCheckin'), arr, q.trim() ? 'Sin resultados' : 'Busca un cliente para registrar su entrada', { conCheckin: true });
+    const hoy = db.asistencias.filter(a => a.fecha === hoyISO()).reverse();
+    $('#cuentaHoy').textContent = hoy.length;
+    $('#tablaHoy').innerHTML = hoy.length ? `<table><tr><th>Hora</th><th>Cliente</th><th>Estado</th><th></th></tr>${hoy.map(a => {
+      const c = db.clientes.find(x => x.id === a.clienteId); if (!c) return '';
+      const e = estado(c);
+      return `<tr><td>${esc(a.hora)}</td><td>${esc(c.nombre)}</td><td><span class="badge ${e.cls}">${e.txt}</span></td>
+        <td><button class="small ghost" data-act="quitarAsist" data-id="${a.id}">Quitar</button></td></tr>`;
+    }).join('')}</table>` : '<div class="empty">Todavía no hay entradas hoy</div>';
+  }
+
+  function renderPagos() {
+    const mes = $('#mesPagos').value || hoyISO().slice(0, 7);
+    const ps = db.pagos.filter(p => p.fecha.startsWith(mes)).sort((a, b) => b.fecha.localeCompare(a.fecha));
+    const total = ps.reduce((s, p) => s + p.monto, 0);
+    const porMetodo = {};
+    ps.forEach(p => porMetodo[p.metodo] = (porMetodo[p.metodo] || 0) + p.monto);
+    $('#statsPagos').innerHTML = [['Total del mes', dinero(total)], ['Pagos', ps.length],
+      ...Object.entries(porMetodo).map(([m, v]) => [m, dinero(v)])]
+      .map(([l, n]) => `<div class="stat"><div class="n">${n}</div><div class="l">${esc(l)}</div></div>`).join('');
+    $('#tablaPagos').innerHTML = ps.length ? `<table><tr><th>Fecha</th><th>Cliente</th><th>Plan</th><th>Monto</th><th>Método</th><th></th></tr>${ps.map(p => {
+      const c = db.clientes.find(x => x.id === p.clienteId);
+      return `<tr><td>${fmt(p.fecha)}</td><td>${esc(c ? c.nombre : '(eliminado)')}</td><td>${esc(p.plan)}</td><td>${dinero(p.monto)}</td><td>${esc(p.metodo)}</td>
+        <td><button class="small ghost" data-act="quitarPago" data-id="${p.id}">Anular</button></td></tr>`;
+    }).join('')}</table>` : '<div class="empty">No hay pagos en este mes</div>';
+  }
+
+  function renderAjustes() {
+    $('#tablaPlanes').innerHTML = db.planes.length ? `<table><tr><th>Plan</th><th>Días</th><th>Precio</th><th></th></tr>${db.planes.map(p =>
+      `<tr><td>${esc(p.nombre)}</td><td>${p.dias}</td><td>${dinero(p.precio)}</td>
+      <td><button class="small ghost" data-act="quitarPlan" data-id="${p.id}">Quitar</button></td></tr>`).join('')}</table>`
+      : '<div class="empty">Agrega al menos un plan</div>';
+    $('#nombreGym').value = db.gym.nombre; $('#moneda').value = db.gym.moneda;
+  }
+
+  function render() { renderPanel(); renderClientes(); renderAsistencia(); renderPagos(); renderAjustes(); }
+
+  // ---------- Diálogos ----------
+  function opcionesPlanes(sel, actual) {
+    sel.innerHTML = db.planes.map(p => `<option value="${p.id}" ${p.id === actual ? 'selected' : ''}>${esc(p.nombre)} — ${p.dias} d — ${dinero(p.precio)}</option>`).join('');
+  }
+
+  function abrirCliente(id) {
+    const f = $('#formCliente'); f.reset();
+    const c = db.clientes.find(x => x.id === id);
+    $('#tituloCliente').textContent = c ? 'Editar cliente' : 'Nuevo cliente';
+    $('#bloqueAlta').style.display = c ? 'none' : '';
+    opcionesPlanes(f.plan, db.planes[1]?.id);
+    f.inicio.value = hoyISO();
+    f.id.value = c ? c.id : '';
+    if (c) ['nombre', 'telefono', 'email', 'documento', 'nacimiento', 'emergencia', 'notas'].forEach(k => f[k].value = c[k] || '');
+    $('#dlgCliente').showModal();
+  }
+
+  $('#formCliente').addEventListener('submit', e => {
+    const f = e.target; const datos = {};
+    ['nombre', 'telefono', 'email', 'documento', 'nacimiento', 'emergencia', 'notas'].forEach(k => datos[k] = f[k].value.trim());
+    if (f.id.value) {
+      Object.assign(db.clientes.find(x => x.id === f.id.value), datos);
+      aviso('Cliente actualizado');
+    } else {
+      const c = { id: uid(), alta: hoyISO(), vence: null, planId: f.plan.value, ...datos };
+      db.clientes.push(c);
+      const p = plan(f.plan.value);
+      if (p && f.pagado.checked) registrarPago(c.id, p.id, p.precio, 'Efectivo', f.inicio.value || hoyISO());
+      else if (p) c.vence = sumarDias(f.inicio.value || hoyISO(), p.dias - 1);
+      aviso('Cliente agregado');
+    }
+    guardar(); render();
+  });
+
+  function abrirRenovar(id) {
+    const c = db.clientes.find(x => x.id === id); const f = $('#formRenovar'); f.reset();
+    f.id.value = id; f.fecha.value = hoyISO();
+    opcionesPlanes(f.plan, c.planId || db.planes[0]?.id);
+    $('#renovarCliente').innerHTML = `<b>${esc(c.nombre)}</b> · vence actualmente: ${fmt(c.vence)}`;
+    const actualizar = () => {
+      const p = plan(f.plan.value); if (!p) return;
+      f.monto.value = p.precio;
+      const fecha = f.fecha.value || hoyISO();
+      const desde = c.vence && c.vence >= fecha ? sumarDias(c.vence, 1) : fecha;
+      $('#renovarNuevoVence').textContent = `Nuevo vencimiento: ${fmt(sumarDias(desde, p.dias - 1))}`;
+    };
+    f.plan.onchange = actualizar; f.fecha.onchange = actualizar; actualizar();
+    $('#dlgRenovar').showModal();
+  }
+
+  $('#formRenovar').addEventListener('submit', e => {
+    const f = e.target;
+    if (!db.planes.length) { aviso('Primero crea un plan'); return; }
+    const hasta = registrarPago(f.id.value, f.plan.value, f.monto.value, f.metodo.value, f.fecha.value || hoyISO());
+    aviso(`Pago registrado. Vence el ${fmt(hasta)}`); render();
+  });
+
+  function verCliente(id) {
+    const c = db.clientes.find(x => x.id === id); const e = estado(c);
+    const pagos = db.pagos.filter(p => p.clienteId === id).sort((a, b) => b.fecha.localeCompare(a.fecha));
+    const asist = db.asistencias.filter(a => a.clienteId === id);
+    const ult30 = asist.filter(a => a.fecha >= sumarDias(hoyISO(), -29)).length;
+    const ultima = asist.map(a => a.fecha).sort().pop();
+    $('#detalleContenido').innerHTML = `
+      <h2>${esc(c.nombre)} <span class="badge ${e.cls}">${e.txt}</span></h2>
+      <div class="grid2" style="font-size:14px">
+        <div><b>Teléfono:</b> ${esc(c.telefono) || '—'}</div><div><b>Email:</b> ${esc(c.email) || '—'}</div>
+        <div><b>Documento:</b> ${esc(c.documento) || '—'}</div><div><b>Nacimiento:</b> ${fmt(c.nacimiento)}</div>
+        <div><b>Emergencia:</b> ${esc(c.emergencia) || '—'}</div><div><b>Cliente desde:</b> ${fmt(c.alta)}</div>
+        <div><b>Vence:</b> ${fmt(c.vence)}</div><div><b>Visitas (30 d):</b> ${ult30} · última: ${fmt(ultima)}</div>
+      </div>
+      ${c.notas ? `<p><b>Notas:</b> ${esc(c.notas)}</p>` : ''}
+      <h3 style="margin-top:14px">Historial de pagos</h3>
+      ${pagos.length ? `<table><tr><th>Fecha</th><th>Plan</th><th>Monto</th><th>Periodo</th></tr>${pagos.map(p =>
+        `<tr><td>${fmt(p.fecha)}</td><td>${esc(p.plan)}</td><td>${dinero(p.monto)}</td><td>${fmt(p.desde)} → ${fmt(p.hasta)}</td></tr>`).join('')}</table>`
+        : '<div class="empty">Sin pagos</div>'}
+      <div class="row-end"><button class="danger small" data-act="eliminar" data-id="${c.id}">Eliminar cliente</button></div>`;
+    $('#dlgDetalle').showModal();
+  }
+
+  // ---------- Exportar / importar ----------
+  function descargar(nombre, contenido, tipo) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([contenido], { type: tipo }));
+    a.download = nombre; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  const csv = filas => '﻿' + filas.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+
+  $('#btnExportar').onclick = () => descargar(`gimnasio-copia-${hoyISO()}.json`, JSON.stringify(db, null, 2), 'application/json');
+  $('#btnCsvClientes').onclick = () => descargar(`clientes-${hoyISO()}.csv`, csv([
+    ['Nombre', 'Teléfono', 'Email', 'Documento', 'Nacimiento', 'Plan', 'Vence', 'Estado', 'Notas'],
+    ...db.clientes.map(c => [c.nombre, c.telefono, c.email, c.documento, c.nacimiento, plan(c.planId)?.nombre, c.vence, estado(c).txt, c.notas])
+  ]), 'text/csv');
+  $('#btnCsvPagos').onclick = () => {
+    const mes = $('#mesPagos').value || hoyISO().slice(0, 7);
+    descargar(`pagos-${mes}.csv`, csv([['Fecha', 'Cliente', 'Plan', 'Monto', 'Método', 'Desde', 'Hasta'],
+      ...db.pagos.filter(p => p.fecha.startsWith(mes)).map(p => [p.fecha, db.clientes.find(c => c.id === p.clienteId)?.nombre, p.plan, p.monto, p.metodo, p.desde, p.hasta])]), 'text/csv');
+  };
+  $('#archivoImportar').onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      const d = JSON.parse(await file.text());
+      if (!Array.isArray(d.clientes) || !Array.isArray(d.planes)) throw 0;
+      if (!confirm(`Esto reemplazará los datos actuales con ${d.clientes.length} clientes. ¿Continuar?`)) return;
+      db = { ...porDefecto(), ...d }; guardar(); render(); aviso('Copia restaurada');
+    } catch { alert('El archivo no es una copia válida.'); }
+    e.target.value = '';
+  };
+  $('#btnBorrarTodo').onclick = () => {
+    if (confirm('¿Borrar TODOS los clientes, pagos y asistencias? Esta acción no se puede deshacer.') &&
+        prompt('Escribe BORRAR para confirmar') === 'BORRAR') { db = porDefecto(); guardar(); render(); aviso('Datos borrados'); }
+  };
+
+  // ---------- Eventos ----------
+  document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('nav button, main section').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); $('#' + b.dataset.tab).classList.add('active');
+    if (b.dataset.tab === 'asistencia') $('#buscarCheckin').focus();
+  });
+  document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('dialog').close());
+  $('#btnNuevo').onclick = () => db.planes.length ? abrirCliente() : aviso('Primero crea un plan en “Planes y datos”');
+  $('#buscar').oninput = renderClientes; $('#filtroEstado').onchange = renderClientes;
+  $('#buscarCheckin').oninput = renderAsistencia;
+  $('#mesPagos').value = hoyISO().slice(0, 7); $('#mesPagos').onchange = renderPagos;
+  $('#nombreGym').onchange = e => { db.gym.nombre = e.target.value.trim() || 'Mi Gimnasio'; guardar(); };
+  $('#moneda').onchange = e => { db.gym.moneda = e.target.value.trim() || '$'; guardar(); render(); };
+  $('#formPlan').onsubmit = e => {
+    e.preventDefault(); const f = e.target;
+    db.planes.push({ id: uid(), nombre: f.nombre.value.trim(), dias: Math.max(1, parseInt(f.dias.value) || 30), precio: Number(f.precio.value) || 0 });
+    guardar(); f.reset(); f.dias.value = 30; f.precio.value = 0; render(); aviso('Plan agregado');
+  };
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const id = b.dataset.id;
+    switch (b.dataset.act) {
+      case 'checkin': checkin(id); break;
+      case 'renovar': abrirRenovar(id); break;
+      case 'editar': abrirCliente(id); break;
+      case 'ver': verCliente(id); break;
+      case 'eliminar':
+        if (confirm('¿Eliminar este cliente y todo su historial?')) {
+          db.clientes = db.clientes.filter(c => c.id !== id);
+          db.pagos = db.pagos.filter(p => p.clienteId !== id);
+          db.asistencias = db.asistencias.filter(a => a.clienteId !== id);
+          guardar(); $('#dlgDetalle').close(); render(); aviso('Cliente eliminado');
+        } break;
+      case 'quitarAsist': db.asistencias = db.asistencias.filter(a => a.id !== id); guardar(); render(); break;
+      case 'quitarPago':
+        if (confirm('¿Anular este pago? (El vencimiento del cliente no se modifica automáticamente.)')) {
+          db.pagos = db.pagos.filter(p => p.id !== id); guardar(); render();
+        } break;
+      case 'quitarPlan':
+        if (confirm('¿Quitar este plan? Los clientes existentes conservan su vencimiento.')) {
+          db.planes = db.planes.filter(p => p.id !== id); guardar(); render();
+        } break;
+    }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
